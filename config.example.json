@@ -1,0 +1,13 @@
+{
+  "host": "127.0.0.1",
+  "port": 8790,
+  "open_browser_on_start": true,
+  "capture_interfaces": [],
+  "capture_ipv6": true,
+  "max_events": 2000,
+  "reverse_dns": true,
+  "public_ip_lookup": true,
+  "public_ip_url": "https://ipinfo.io/json",
+  "ui_refresh_seconds": 2,
+  "vpn_adapter_pattern": "wireguard|wintun|tap-|tun|openvpn|vpn|pia|nord|proton|mullvad|express|surfshark|tailscale|zerotier|hamachi|fortinet|cisco anyconnect|wan miniport"
+}

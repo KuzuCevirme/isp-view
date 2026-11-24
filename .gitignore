@@ -1,0 +1,10 @@
+# Your settings (recreated with defaults on start)
+config.json
+
+# Python / build output
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+assets/icon.ico

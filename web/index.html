@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ISP View</title>
+<style>
+:root{--bg:#f5f6f8;--card:#fff;--ink:#15181d;--mute:#667085;--line:#e4e7ec;--acc:#1e78dc;
+--bad:#d92d20;--warn:#dc6803;--good:#079455;--chip:#eef1f5}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--card:#171b22;--ink:#e6e8eb;--mute:#8b95a5;
+--line:#262c36;--acc:#4ea1ff;--bad:#f97066;--warn:#fdb022;--good:#47cd89;--chip:#222833}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+h1{font-size:18px;margin:0}h1 span{color:var(--mute);font-weight:400;font-size:14px;margin-left:8px}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:6px 12px;border-radius:8px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+a.coffee{display:inline-flex;align-items:center;padding:6px 12px;border-radius:8px;background:#ffdd00;color:#000;font-weight:600;text-decoration:none;border:1px solid #e6c700}
+a.coffee:hover{background:#ffe740}
+main{padding:20px;max-width:1400px;margin:0 auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.card h3{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute);font-weight:600}
+.big{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums}
+.sub{color:var(--mute);font-size:12.5px}
+.verdict{border-left:4px solid var(--warn)}
+.verdict.bad{border-left-color:var(--bad)}.verdict.good{border-left-color:var(--good)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0 12px}
+.tabs button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=search]{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);min-width:220px}
+.tablewrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card)}
+td.name{font-weight:500;word-break:break-all}
+td.small{font-size:12.5px;color:var(--mute);word-break:break-all}
+.k{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--chip);margin:1px 3px 1px 0}
+.k.DNS,.k.HTTP{color:var(--bad)}.k.TLS,.k.QUIC{color:var(--warn)}.k.ECH,.k.DoH,.k.DoT,.k.VPN{color:var(--good)}
+.legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:8px;margin-top:16px}
+.legend div{font-size:13px}
+.err{background:#fef3f2;color:#b42318;border:1px solid #fecdca;border-radius:10px;padding:10px 14px;margin-bottom:12px}
+@media (prefers-color-scheme:dark){.err{background:#3a1512;color:#fda29b;border-color:#7a271a}}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.hidden{display:none}
+ul.plain{margin:6px 0 0;padding-left:18px}
+</style>
+</head>
+<body>
+<header>
+  <h1>ISP View<span>what your internet provider can see</span></h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button id="pause">Pause</button>
+    <button id="clear">Clear</button>
+    <button id="rescan">Re-check network</button>
+    <a class="coffee" href="https://buymeacoffee.com/kuzucevirme" target="_blank" rel="noopener">☕ Buy me a coffee</a>
+  </div>
+</header>
+<main>
+  <div id="errors"></div>
+  <div class="grid">
+    <div class="card verdict" id="verdict"><h3>Verdict</h3><div id="verdictText" class="big" style="font-size:18px">Collecting…</div><div class="sub" id="verdictSub"></div></div>
+    <div class="card"><h3>Your public identity</h3><div class="big" id="pubip">…</div><div class="sub" id="pubinfo"></div></div>
+    <div class="card"><h3>Sites revealed by name</h3><div class="big" id="ndomains">0</div><div class="sub" id="nkinds"></div></div>
+    <div class="card"><h3>Servers you talked to</h3><div class="big" id="nhosts">0</div><div class="sub" id="traffic"></div></div>
+    <div class="card"><h3>Network</h3><div id="netinfo" class="sub">…</div></div>
+  </div>
+
+  <div class="toolbar">
+    <div class="tabs">
+      <button data-tab="domains" class="on">Sites they see</button>
+      <button data-tab="events">Live feed</button>
+      <button data-tab="hosts">Connections (IP level)</button>
+      <button data-tab="about">What they can't see</button>
+    </div>
+    <input type="search" id="q" placeholder="Filter…">
+  </div>
+
+  <section id="tab-domains" class="tablewrap"><table><thead><tr><th>Site name</th><th>Revealed by</th><th>Times</th><th>Traffic</th><th>Server IPs</th><th>Last seen</th></tr></thead><tbody id="tDomains"></tbody></table></section>
+  <section id="tab-events" class="tablewrap hidden"><table><thead><tr><th>Time</th><th>How</th><th>Name</th><th>Details visible to ISP</th><th>Server</th></tr></thead><tbody id="tEvents"></tbody></table></section>
+  <section id="tab-hosts" class="tablewrap hidden"><table><thead><tr><th>Remote IP</th><th>Likely name</th><th>Reverse DNS</th><th>Proto / ports</th><th>Sent</th><th>Received</th><th>Last seen</th></tr></thead><tbody id="tHosts"></tbody></table></section>
+  <section id="tab-about" class="card hidden">
+    <h3>Always visible to your ISP</h3>
+    <ul class="plain">
+      <li>Your public IP address, and so your rough location and your account.</li>
+      <li>Every server IP you connect to, plus the port, protocol, timing and amount of data (see "Connections").</li>
+      <li>Website names from plain DNS lookups, the HTTPS handshake (SNI) and the first QUIC/HTTP3 packet.</li>
+      <li>For unencrypted <b>http://</b> sites: the full URL, headers and page content.</li>
+    </ul>
+    <h3 style="margin-top:14px">Not visible with HTTPS</h3>
+    <ul class="plain">
+      <li>The page or path inside a site (for example /watch?v=…), search terms, form data, passwords, messages and cookies.</li>
+      <li>The page content itself.</li>
+    </ul>
+    <h3 style="margin-top:14px">How to hide more</h3>
+    <ul class="plain">
+      <li><b>Encrypted DNS</b> (DoH/DoT, in Windows or your browser) hides lookups, but SNI still shows site names.</li>
+      <li><b>ECH</b> (Encrypted Client Hello, supported by Chrome/Firefox with sites behind Cloudflare and similar) hides the SNI too.</li>
+      <li><b>A VPN</b> hides everything above, but your ISP still sees the VPN server and how much data you send. Your VPN provider then sees what your ISP saw.</li>
+    </ul>
+    <h3 style="margin-top:14px">What each label means</h3>
+    <div class="legend" id="legend"></div>
+  </section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let tab='domains', S=null;
+const fmtB=b=>{if(b<1024)return b+' B';const u=['KB','MB','GB','TB'];let i=-1;do{b/=1024;i++}while(b>=1024&&i<3);return b.toFixed(b<10?1:0)+' '+u[i]};
+const ago=t=>{const s=Math.max(0,Math.round(S.now-t));return s<60?s+'s ago':s<3600?Math.floor(s/60)+'m ago':Math.floor(s/3600)+'h ago'};
+const clock=t=>new Date(t*1000).toLocaleTimeString();
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const chip=k=>`<span class="k ${k}" title="${esc(S.kind_info[k]||'')}">${k}</span>`;
+
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{tab=b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('main section').forEach(s=>s.classList.toggle('hidden',s.id!=='tab-'+tab));render()});
+$('q').oninput=render;
+const post=p=>fetch(p,{method:'POST'}).then(load);
+$('pause').onclick=()=>post('/api/pause');$('clear').onclick=()=>post('/api/clear');
+$('rescan').onclick=()=>post('/api/rescan');
+
+function verdict(){
+  const c=S.counts, n=S.network||{}, vpn=(n.vpn_adapters||[]).length>0;
+  const plain=(c.DNS||0), sni=(c.TLS||0)+(c.QUIC||0), http=c.HTTP||0, enc=(c.DoH||0)+(c.DoT||0);
+  const el=$('verdict'); el.className='card verdict';
+  let t,sub=[];
+  if(S.packets<20){t='Collecting traffic…';sub.push('Browse a few sites to see what shows up.')}
+  else if(http){t='They can see full web addresses';el.classList.add('bad');sub.push(http+' unencrypted http:// requests (full URL visible).')}
+  else if(plain){t='They can see every site you look up';el.classList.add('bad');sub.push(plain+' plain DNS lookups.')}
+  else if(sni){t='They see site names, not pages';sub.push('DNS looks hidden'+(enc?' (encrypted DNS in use)':'')+', but '+sni+' HTTPS handshakes reveal site names.')}
+  else{t='Mostly hidden';el.classList.add('good');sub.push('No site names leaked so far. They still see server IPs and traffic volume.')}
+  if(vpn)sub.push('VPN adapter detected: '+n.vpn_adapters.map(v=>v.alias).join(', ')+'. Capturing the physical adapter, i.e. the traffic the ISP actually gets.');
+  $('verdictText').textContent=t;$('verdictSub').textContent=sub.join(' ');
+}
+
+function header(){
+  const p=S.public;
+  if(p){$('pubip').textContent=p.ip||'?';$('pubinfo').textContent=[p.org,[p.city,p.region,p.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+  else $('pubip').textContent=S.public_err?'lookup failed':'…';
+  $('ndomains').textContent=S.domain_count;
+  $('nkinds').innerHTML=Object.entries(S.counts).map(([k,v])=>chip(k)+v).join(' ')||'nothing yet';
+  $('nhosts').textContent=S.host_count;
+  $('traffic').textContent=`↑ ${fmtB(S.bytes_out)} · ↓ ${fmtB(S.bytes_in)} · since ${clock(S.started)}${S.paused?' · PAUSED':''}`;
+  $('pause').textContent=S.paused?'Resume':'Pause';
+  const ifs=(S.network.interfaces||[]);
+  $('netinfo').innerHTML=ifs.map(i=>`<b>${esc(i.alias)}</b> ${esc(i.desc||'')}<br>Local IP ${esc(i.v4.join(', '))}<br>Gateway ${esc(i.gw4.join(', ')||'-')}<br>DNS servers ${esc(i.dns.join(', ')||'-')}${i.dns_doh&&i.dns_doh.length?' (DoH registered for '+esc(i.dns_doh.join(', '))+')':' (plain DNS)'}`).join('<hr>')
+    +'<br>Capturing: '+esc((S.capture_on||[]).map(c=>c.family+' '+c.ip).join(', ')||'nothing');
+  $('errors').innerHTML=(S.errors||[]).map(e=>`<div class="err">${esc(e)}</div>`).join('')+(S.public_err?`<div class="err">Public IP lookup: ${esc(S.public_err)}</div>`:'');
+}
+
+function render(){
+  if(!S)return;
+  const q=$('q').value.trim().toLowerCase(), m=s=>!q||JSON.stringify(s).toLowerCase().includes(q);
+  if(tab==='domains')$('tDomains').innerHTML=S.domains.filter(m).map(d=>`<tr><td class="name">${esc(d.name)}</td><td>${d.kinds.map(chip).join('')}</td><td>${d.hits}</td><td>${d.bytes?fmtB(d.bytes):''}</td><td class="small">${esc(d.ips.join(', '))}</td><td class="small">${ago(d.last)}</td></tr>`).join('')||'<tr><td colspan=6 class="small">Nothing yet. Open a few websites.</td></tr>';
+  if(tab==='events')$('tEvents').innerHTML=S.events.slice().reverse().filter(m).map(e=>`<tr><td class="small">${clock(e.t)}</td><td>${chip(e.kind)}</td><td class="name">${esc(e.name||'')}</td><td class="small">${esc(e.detail)}${e.hits>1?' ×'+e.hits:''}</td><td class="small">${esc(e.remote)}:${e.port}</td></tr>`).join('');
+  if(tab==='hosts')$('tHosts').innerHTML=S.hosts.filter(m).map(h=>`<tr><td class="name">${esc(h.ip)}</td><td class="small">${esc(h.names.join(', '))}</td><td class="small">${esc(h.rdns||'')}</td><td class="small">${esc(h.proto.join('/'))} ${esc(h.ports.join(', '))}</td><td>${fmtB(h.out)}</td><td>${fmtB(h.in)}</td><td class="small">${ago(h.last)}</td></tr>`).join('');
+  if(tab==='about')$('legend').innerHTML=Object.entries(S.kind_info).map(([k,v])=>`<div>${chip(k)} ${esc(v)}</div>`).join('');
+}
+
+async function load(){
+  try{S=await (await fetch('/api/state')).json();header();verdict();render()}catch(e){}
+}
+load();(function loop(){setTimeout(()=>load().then(loop),(S&&S.refresh||2)*1000)})();
+</script>
+</body>
+</html>
